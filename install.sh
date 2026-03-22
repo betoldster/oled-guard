@@ -16,8 +16,15 @@ echo ""
 # ── 1. Copy scripts ────────────────────────────────────────────────────────────
 echo "→ Copying scripts to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
-cp blackout.py watcher.py "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py"
+cp blackout.py watcher.py update.sh "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py" "$INSTALL_DIR/update.sh"
+
+# Save the repo path so update.sh can find it when run from the install dir
+echo "$(pwd)" > "$INSTALL_DIR/.repo_path"
+
+echo "→ Copying management scripts to $INSTALL_DIR"
+cp install.sh uninstall.sh update.sh "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/update.sh"
 
 # ── 2. Check tkinter ───────────────────────────────────────────────────────────
 echo "→ Checking tkinter..."
@@ -58,10 +65,20 @@ else
     if [[ "$PYTHON" == *"linuxbrew"* || "$PYTHON" == *"homebrew"* ]]; then
         echo "    Detected Homebrew Python → installing build deps + pip"
         command -v apt &>/dev/null && sudo apt install -y libdbus-1-dev pkg-config 2>/dev/null || true
-        python3 -m pip install dbus-python --quiet || {
+        if python3 -m pip install dbus-python --quiet 2>/dev/null; then
+            : # success
+        elif python3 -m pip install dbus-python --quiet --break-system-packages --user 2>/dev/null; then
+            echo "    (installed with --break-system-packages)"
+        elif command -v apt &>/dev/null && sudo apt install -y python3-dbus 2>/dev/null; then
+            echo "    (installed via apt python3-dbus)"
+            # apt installed dbus for the system Python, not Homebrew's.
+            # Find the system Python's dist-packages so we can expose it to Homebrew Python via PYTHONPATH.
+            SYS_DBUS_PATH=$(/usr/bin/python3 -c \
+                "import dbus, os; print(os.path.dirname(os.path.dirname(dbus.__file__)))" 2>/dev/null || true)
+        else
             echo "  WARNING: pip install dbus-python failed."
             echo "  Try: sudo apt install python3-dbus"
-        }
+        fi
     elif command -v apt &>/dev/null; then
         sudo apt install -y python3-dbus || {
             echo "  WARNING: apt install python3-dbus failed. Install manually."
@@ -74,7 +91,60 @@ else
         || echo "  WARNING: dbus-python still not importable — watcher may fail."
 fi
 
-# ── 4. Install systemd service ─────────────────────────────────────────────────
+# ── 4. Check monitor geometry detection ────────────────────────────────────────
+echo "→ Checking monitor geometry detection..."
+MONITOR_TOOL_FOUND=false
+
+if command -v wlr-randr &>/dev/null; then
+    echo "  ✓ wlr-randr available (wlroots compositors: sway, Hyprland, …)"
+    MONITOR_TOOL_FOUND=true
+fi
+
+if command -v kscreen-doctor &>/dev/null; then
+    echo "  ✓ kscreen-doctor available (KDE Plasma)"
+    MONITOR_TOOL_FOUND=true
+fi
+
+if python3 -c "
+import dbus, sys
+try:
+    bus = dbus.SessionBus()
+    bus.get_object('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig')
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null; then
+    echo "  ✓ GNOME Mutter DisplayConfig available (GNOME Wayland)"
+    MONITOR_TOOL_FOUND=true
+fi
+
+if command -v xrandr &>/dev/null; then
+    echo "  ✓ xrandr available (X11 / Xwayland fallback)"
+    MONITOR_TOOL_FOUND=true
+fi
+
+if [ "$MONITOR_TOOL_FOUND" = false ]; then
+    echo "  ✗ No monitor detection tool found."
+    echo "  NOTE: xrandr (x11-xserver-utils) is an X11 tool and may not detect"
+    echo "        all monitors under native Wayland. Wayland-native tools are preferred:"
+    echo "    wlroots (sway/Hyprland): sudo apt install wlr-randr"
+    echo "    KDE Plasma:              kscreen-doctor is included with KDE"
+    echo "    GNOME:                   uses DBus (no extra tool needed)"
+    echo "  Falling back to xrandr as a last resort..."
+    if command -v apt &>/dev/null; then
+        sudo apt install -y x11-xserver-utils || {
+            echo "  WARNING: apt install x11-xserver-utils failed."
+            echo "  Multi-monitor detection will fall back to virtual desktop size."
+        }
+    else
+        echo "  WARNING: Cannot detect package manager."
+        echo "  Multi-monitor detection will fall back to virtual desktop size."
+    fi
+    command -v xrandr &>/dev/null && echo "  ✓ xrandr installed" \
+        || echo "  WARNING: xrandr still not found — per-monitor blackout may not work correctly."
+fi
+
+# ── 5. Install systemd service ─────────────────────────────────────────────────
 echo "→ Installing systemd user service..."
 mkdir -p "$SERVICE_DIR"
 cp oled-guard.service "$SERVICE_DIR/$SERVICE_NAME"
@@ -83,7 +153,14 @@ cp oled-guard.service "$SERVICE_DIR/$SERVICE_NAME"
 sed -i "s|/usr/bin/python3|$PYTHON|g" "$SERVICE_DIR/$SERVICE_NAME"
 echo "  ExecStart patched → $PYTHON"
 
-# ── 5. Enable and start ────────────────────────────────────────────────────────
+# If apt installed dbus for the system Python, expose its site-packages to Homebrew Python via PYTHONPATH
+if [[ -n "${SYS_DBUS_PATH:-}" ]]; then
+    sed -i "s|^PassEnvironment=|Environment=PYTHONPATH=${SYS_DBUS_PATH}\nPassEnvironment=|" \
+        "$SERVICE_DIR/$SERVICE_NAME"
+    echo "  Service patched → PYTHONPATH=$SYS_DBUS_PATH (system dbus-python)"
+fi
+
+# ── 6. Enable and start ────────────────────────────────────────────────────────
 echo "→ Enabling and starting oled-guard service..."
 systemctl --user daemon-reload
 systemctl --user enable "$SERVICE_NAME"
