@@ -79,6 +79,7 @@ def main():
             all_windows.append(win)
 
     root.focus_force()
+    root.grab_set()
     root.mainloop()
 
 
