@@ -57,7 +57,7 @@ The installer handles both automatically.
 ## Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/oled-guard.git
+git clone https://github.com/betoldster/oled-guard.git
 cd oled-guard
 bash install.sh
 ```
