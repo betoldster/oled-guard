@@ -136,6 +136,16 @@ signal.signal(signal.SIGINT,  _shutdown)
 # ── Main loop ───────────────────────────────────────────────────────────────────
 
 def main():
+    try:
+        import dbus  # noqa: F401
+    except ImportError:
+        log.error(
+            "dbus-python is not installed — cannot detect idle time.\n"
+            "  Fix: sudo apt install python3-dbus\n"
+            "  Then: systemctl --user restart oled-guard"
+        )
+        sys.exit(1)
+
     log.info(
         f"Started. Threshold: {IDLE_THRESHOLD_SECONDS}s, "
         f"poll every {POLL_INTERVAL_SECONDS}s."
