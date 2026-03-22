@@ -1,0 +1,33 @@
+[Unit]
+Description=OLED Guard — idle screen blackout for OLED monitors
+Documentation=https://github.com/YOUR_USERNAME/oled-guard
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+
+# Path is patched by install.sh to use the correct python3 binary
+ExecStart=/usr/bin/python3 %h/.config/oled-guard/watcher.py
+
+Restart=on-failure
+RestartSec=10s
+
+# Keep resource usage minimal
+CPUQuota=1%
+Nice=19
+IOSchedulingClass=idle
+
+# Inherit Wayland/DBus environment from the user session
+PassEnvironment=WAYLAND_DISPLAY DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS
+
+# Basic hardening
+PrivateTmp=true
+NoNewPrivileges=true
+
+# Logs visible via: journalctl --user -u oled-guard -f
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical-session.target
