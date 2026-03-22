@@ -14,7 +14,7 @@ Modern Linux desktops have largely dropped traditional screensavers, leaving OLE
 ## Features
 
 - 🖥️ **Multi-monitor** — covers every connected display simultaneously
-- ⚡ **Instant dismiss** — left click or any key closes it immediately
+- ⚡ **Instant dismiss** — left click, `ESC`, or any key closes it immediately
 - 🔋 **Near-zero resource usage** — sleeping daemon + blocking event wait
 - 🔌 **Auto-starts on login** — managed as a systemd user service
 - 🧩 **Wayland-native** — idle detection via DBus (GNOME, KDE, and others)
@@ -151,6 +151,17 @@ Or for a specific version:
 brew install python-tk@3.14
 ```
 
+### ESC or keypress doesn't dismiss the blackout
+
+This can happen on compositors that don't honor focus requests for
+`overrideredirect` windows (common with XWayland). The blackout window
+uses `grab_set()` to capture all keyboard and pointer input, so if you
+encounter this issue make sure you are running the latest version:
+
+```bash
+bash update.sh
+```
+
 ### Service won't start after login
 
 Check that `graphical-session.target` is active:
@@ -168,13 +179,14 @@ If it's not, add `watcher.py` to your compositor's autostart as a workaround.
 From the cloned repo directory:
 
 ```bash
-git pull
 bash update.sh
 ```
 
-`update.sh` will pull the latest source, copy the updated scripts to
-`~/.config/oled-guard/`, refresh the systemd service file, and restart
-the service — all in one step.
+`update.sh` will:
+1. Pull the latest source (`git pull`)
+2. Copy updated scripts to `~/.config/oled-guard/`
+3. Refresh and re-patch the systemd service file
+4. Reload systemd and restart the service
 
 ---
 
