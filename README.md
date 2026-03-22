@@ -179,6 +179,12 @@ If it's not, add `watcher.py` to your compositor's autostart as a workaround.
 Pull the latest changes and apply them in one command:
 
 ```bash
+bash ~/.config/oled-guard/update.sh
+```
+
+Or from the repo directory:
+
+```bash
 bash update.sh
 ```
 
