@@ -1,6 +1,6 @@
 [Unit]
 Description=OLED Guard — idle screen blackout for OLED monitors
-Documentation=https://github.com/YOUR_USERNAME/oled-guard
+Documentation=https://github.com/betoldster/oled-guard
 After=graphical-session.target
 PartOf=graphical-session.target
 

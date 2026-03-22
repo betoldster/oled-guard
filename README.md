@@ -68,7 +68,7 @@ bash install.sh
 ```
 
 The installer will:
-1. Copy `blackout.py`, `watcher.py`, `install.sh`, `uninstall.sh`, and `update.sh` to `~/.config/oled-guard/`
+1. Copy all scripts to `~/.config/oled-guard/`
 2. Install `python3-tk` if missing (supports both Homebrew and apt)
 3. Install `python3-dbus` if missing
 4. Detect available monitor geometry tools (`wlr-randr`, `kscreen-doctor`, GNOME Mutter DBus, `xrandr`)
@@ -156,10 +156,10 @@ If you're using Homebrew Python:
 brew install python-tk
 ```
 
-Or for a specific version:
+Or for a specific Python version (e.g. 3.12):
 
 ```bash
-brew install python-tk@3.14
+brew install python-tk@3.12
 ```
 
 ### ESC or keypress doesn't dismiss the blackout

@@ -54,14 +54,10 @@ git pull
 # ── 2. Copy updated scripts ─────────────────────────────────────────────────────
 echo "→ Updating scripts in $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR"
-cp blackout.py watcher.py update.sh "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py" "$INSTALL_DIR/update.sh"
-echo "  ✓ blackout.py, watcher.py, and update.sh updated"
-
-echo "→ Updating management scripts in $INSTALL_DIR..."
-cp install.sh uninstall.sh update.sh "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/update.sh"
-echo "  ✓ install.sh, uninstall.sh, and update.sh updated"
+cp blackout.py watcher.py install.sh uninstall.sh update.sh "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py" \
+         "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/update.sh"
+echo "  ✓ Scripts updated"
 
 # ── 3. Handle any new files added in this update ────────────────────────────────
 if [[ -n "$NEW_FILES" ]]; then
