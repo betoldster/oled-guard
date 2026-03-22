@@ -62,10 +62,16 @@ else
     if [[ "$PYTHON" == *"linuxbrew"* || "$PYTHON" == *"homebrew"* ]]; then
         echo "    Detected Homebrew Python → installing build deps + pip"
         command -v apt &>/dev/null && sudo apt install -y libdbus-1-dev pkg-config 2>/dev/null || true
-        python3 -m pip install dbus-python --quiet || {
+        if python3 -m pip install dbus-python --quiet 2>/dev/null; then
+            : # success
+        elif python3 -m pip install dbus-python --quiet --break-system-packages --user 2>/dev/null; then
+            echo "    (installed with --break-system-packages)"
+        elif command -v apt &>/dev/null && sudo apt install -y python3-dbus 2>/dev/null; then
+            echo "    (installed via apt python3-dbus)"
+        else
             echo "  WARNING: pip install dbus-python failed."
             echo "  Try: sudo apt install python3-dbus"
-        }
+        fi
     elif command -v apt &>/dev/null; then
         sudo apt install -y python3-dbus || {
             echo "  WARNING: apt install python3-dbus failed. Install manually."
