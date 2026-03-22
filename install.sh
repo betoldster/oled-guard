@@ -68,6 +68,10 @@ else
             echo "    (installed with --break-system-packages)"
         elif command -v apt &>/dev/null && sudo apt install -y python3-dbus 2>/dev/null; then
             echo "    (installed via apt python3-dbus)"
+            # apt installed dbus for the system Python, not Homebrew's.
+            # Find the system Python's dist-packages so we can expose it to Homebrew Python via PYTHONPATH.
+            SYS_DBUS_PATH=$(/usr/bin/python3 -c \
+                "import dbus, os; print(os.path.dirname(os.path.dirname(dbus.__file__)))" 2>/dev/null || true)
         else
             echo "  WARNING: pip install dbus-python failed."
             echo "  Try: sudo apt install python3-dbus"
@@ -145,6 +149,13 @@ cp oled-guard.service "$SERVICE_DIR/$SERVICE_NAME"
 # Patch ExecStart to use whichever python3 is active
 sed -i "s|/usr/bin/python3|$PYTHON|g" "$SERVICE_DIR/$SERVICE_NAME"
 echo "  ExecStart patched → $PYTHON"
+
+# If apt installed dbus for the system Python, expose its site-packages to Homebrew Python via PYTHONPATH
+if [[ -n "${SYS_DBUS_PATH:-}" ]]; then
+    sed -i "s|^PassEnvironment=|Environment=PYTHONPATH=${SYS_DBUS_PATH}\nPassEnvironment=|" \
+        "$SERVICE_DIR/$SERVICE_NAME"
+    echo "  Service patched → PYTHONPATH=$SYS_DBUS_PATH (system dbus-python)"
+fi
 
 # ── 6. Enable and start ────────────────────────────────────────────────────────
 echo "→ Enabling and starting oled-guard service..."

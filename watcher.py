@@ -19,8 +19,6 @@ import signal
 import logging
 import subprocess
 
-import dbus
-
 # ── Configuration ──────────────────────────────────────────────────────────────
 
 # How long (seconds) of idle before blackout triggers
@@ -51,6 +49,12 @@ def get_idle_seconds() -> float:
     Tries multiple interfaces for GNOME, KDE, and generic compositors.
     Returns 0.0 on failure.
     """
+    try:
+        import dbus
+    except ImportError:
+        log.warning("dbus-python not available — idle detection disabled.")
+        return 0.0
+
     interfaces = [
         # GNOME / PikaOS (Mutter)
         ("org.gnome.Mutter.IdleMonitor",
