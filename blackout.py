@@ -14,15 +14,99 @@ import sys
 import re
 
 
-def get_monitor_geometries() -> list[dict]:
-    """
-    Detect all connected monitors and their geometries via xrandr.
-    Falls back to full virtual desktop if xrandr is unavailable.
-    """
+def _monitors_via_mutter_dbus() -> list[dict]:
+    """Detect monitors via GNOME Mutter DisplayConfig DBus (GNOME Wayland)."""
+    try:
+        import dbus
+        bus = dbus.SessionBus()
+        proxy = bus.get_object(
+            "org.gnome.Mutter.DisplayConfig",
+            "/org/gnome/Mutter/DisplayConfig"
+        )
+        iface = dbus.Interface(proxy, "org.gnome.Mutter.DisplayConfig")
+        serial, monitors, logical_monitors, _props = iface.GetCurrentState()
+
+        # Build map: (connector, serial) -> (width, height) for the current mode
+        mode_dims: dict[tuple, tuple] = {}
+        for connector, _vendor, _product, mon_serial, modes, _mon_props in monitors:
+            for _mode_id, w, h, _refresh, _pref_scale, _supp_scales, mode_props in modes:
+                if mode_props.get("is-current", False):
+                    mode_dims[(str(connector), str(mon_serial))] = (int(w), int(h))
+                    break
+
+        result = []
+        for x, y, _scale, _transform, _primary, mon_specs, _lm_props in logical_monitors:
+            for connector, mon_serial, _mode_id in mon_specs:
+                dims = mode_dims.get((str(connector), str(mon_serial)))
+                if dims:
+                    result.append({"w": dims[0], "h": dims[1], "x": int(x), "y": int(y)})
+                    break
+        return result
+    except Exception:
+        return []
+
+
+def _monitors_via_wlr_randr() -> list[dict]:
+    """Detect monitors via wlr-randr (wlroots compositors: sway, Hyprland, etc.)."""
     try:
         result = subprocess.run(
-            ["xrandr", "--query"],
-            capture_output=True, text=True, timeout=3
+            ["wlr-randr"], capture_output=True, text=True, timeout=3
+        )
+        if result.returncode != 0:
+            return []
+
+        monitors = []
+        # Each monitor block starts with a non-indented line
+        blocks = re.split(r"\n(?=\S)", result.stdout.strip())
+        for block in blocks:
+            size_m = re.search(r"(\d+)x(\d+)\s+px", block)
+            pos_m = re.search(r"Position:\s+(\d+),(\d+)", block)
+            enabled_m = re.search(r"Enabled:\s+(yes|no)", block, re.IGNORECASE)
+            if not (size_m and pos_m):
+                continue
+            if enabled_m and enabled_m.group(1).lower() == "no":
+                continue
+            monitors.append({
+                "w": int(size_m.group(1)), "h": int(size_m.group(2)),
+                "x": int(pos_m.group(1)), "y": int(pos_m.group(2)),
+            })
+        return monitors
+    except Exception:
+        return []
+
+
+def _monitors_via_kscreen() -> list[dict]:
+    """Detect monitors via kscreen-doctor (KDE Plasma Wayland)."""
+    try:
+        result = subprocess.run(
+            ["kscreen-doctor", "-o"], capture_output=True, text=True, timeout=3
+        )
+        if result.returncode != 0:
+            return []
+
+        monitors = []
+        # Each output block starts with "Output:"
+        blocks = re.split(r"\n(?=Output:)", result.stdout.strip())
+        for block in blocks:
+            if not re.search(r"Enabled:\s+true", block, re.IGNORECASE):
+                continue
+            size_m = re.search(r"Size:\s+(\d+)x(\d+)", block)
+            pos_m = re.search(r"Pos:\s+(\d+),(\d+)", block)
+            if size_m and pos_m:
+                monitors.append({
+                    "w": int(size_m.group(1)), "h": int(size_m.group(2)),
+                    "x": int(pos_m.group(1)), "y": int(pos_m.group(2)),
+                })
+        return monitors
+    except Exception:
+        return []
+
+
+def _monitors_via_xrandr() -> list[dict]:
+    """Detect monitors via xrandr (X11 / Xwayland fallback)."""
+    try:
+        result = subprocess.run(
+            ["xrandr", "--query"], capture_output=True, text=True, timeout=3
         )
         if result.returncode == 0:
             pattern = re.compile(
@@ -36,8 +120,26 @@ def get_monitor_geometries() -> list[dict]:
                 return monitors
     except Exception:
         pass
+    return []
 
-    # Fallback: cover the full virtual desktop
+
+def get_monitor_geometries() -> list[dict]:
+    """
+    Detect all connected monitors and their geometries.
+    Tries Wayland-native methods first (GNOME Mutter DBus, wlr-randr, kscreen-doctor),
+    then xrandr for X11/Xwayland, then falls back to the full virtual desktop.
+    """
+    for fn in (
+        _monitors_via_mutter_dbus,
+        _monitors_via_wlr_randr,
+        _monitors_via_kscreen,
+        _monitors_via_xrandr,
+    ):
+        monitors = fn()
+        if monitors:
+            return monitors
+
+    # Final fallback: cover the full virtual desktop
     root = tk.Tk()
     w, h = root.winfo_screenwidth(), root.winfo_screenheight()
     root.destroy()
@@ -78,6 +180,7 @@ def main():
                 win.bind(seq, lambda e, r=root: dismiss(r, e))
             all_windows.append(win)
 
+    root.update()
     root.focus_force()
     root.grab_set()
     root.mainloop()

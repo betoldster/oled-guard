@@ -49,24 +49,30 @@ Idle time is read from the DBus session bus, tried in order:
 - Python 3.10+
 - `python3-tk` — for the blackout window
 - `python3-dbus` — for idle detection
+- One of the following for accurate per-monitor geometry detection (optional, falls back to virtual desktop):
+  - GNOME Wayland: uses `python3-dbus` (already required — no extra tool needed)
+  - wlroots compositors (sway, Hyprland, …): `wlr-randr`
+  - KDE Plasma: `kscreen-doctor` (included with KDE)
+  - X11 / Xwayland fallback: `xrandr` (`x11-xserver-utils`)
 
-The installer handles both automatically.
+The installer checks and installs all dependencies automatically.
 
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/oled-guard.git
+git clone https://github.com/betoldster/oled-guard.git
 cd oled-guard
 bash install.sh
 ```
 
 The installer will:
-1. Copy scripts to `~/.config/oled-guard/`
+1. Copy `blackout.py`, `watcher.py`, `install.sh`, `uninstall.sh`, and `update.sh` to `~/.config/oled-guard/`
 2. Install `python3-tk` if missing (supports both Homebrew and apt)
 3. Install `python3-dbus` if missing
-4. Register and start the systemd user service
+4. Detect available monitor geometry tools (`wlr-randr`, `kscreen-doctor`, GNOME Mutter DBus, `xrandr`)
+5. Register and start the systemd user service
 
 ---
 
@@ -129,13 +135,18 @@ dbus-send --session --print-reply --dest=org.freedesktop.DBus \
 
 ### Doesn't cover all monitors
 
-Install `xrandr` for accurate per-monitor geometry detection:
+`xrandr` (`x11-xserver-utils`) is an **X11 tool** and does not reliably detect individual monitor geometries under native Wayland. OLED Guard now uses Wayland-native detection methods instead, tried in this order:
 
-```bash
-sudo apt install x11-xserver-utils
-```
+| Method | Compositor | What to install |
+|--------|-----------|-----------------|
+| GNOME Mutter DBus | GNOME Wayland | Nothing — uses `python3-dbus` (already required) |
+| `wlr-randr` | sway, Hyprland, wlroots | `sudo apt install wlr-randr` |
+| `kscreen-doctor` | KDE Plasma | Included with KDE |
+| `xrandr` | X11 / Xwayland | `sudo apt install x11-xserver-utils` |
 
-Without it, the fallback mode covers the entire virtual desktop.
+If none of the above are available, the fallback mode covers the entire virtual desktop with a single window.
+
+The installer automatically checks which tools are present and reports what it finds.
 
 ### `No module named '_tkinter'` error
 
@@ -178,12 +189,11 @@ bash update.sh
 ```
 
 The updater will:
-1. Locate the git repo (uses the path saved during install)
-2. Fetch and pull the latest commits
-3. Copy updated scripts to `~/.config/oled-guard/` (including `update.sh` itself)
-4. Detect and install any **new files** added in the update
-5. Reinstall the systemd service unit if it changed
-6. Restart the service automatically
+1. Fetch and pull the latest commits
+2. Copy updated `blackout.py`, `watcher.py`, `install.sh`, `uninstall.sh`, and `update.sh` to `~/.config/oled-guard/`
+3. Detect and install any **new files** added in the update
+4. Reinstall the systemd service unit if it changed
+5. Restart the service automatically
 
 If you are already on the latest version it exits immediately with no changes.
 
@@ -191,8 +201,12 @@ If you are already on the latest version it exits immediately with no changes.
 
 ## Uninstall
 
+From the cloned repo directory, or from the installed location:
+
 ```bash
 bash uninstall.sh
+# or, if you no longer have the repo:
+bash ~/.config/oled-guard/uninstall.sh
 ```
 
 ---
