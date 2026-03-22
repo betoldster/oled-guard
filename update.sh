@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # update.sh — OLED Guard updater
-# Run from the repo directory: bash update.sh
+# Can be run from the repo directory OR from ~/.config/oled-guard/
 
 set -e
 
@@ -11,6 +11,25 @@ PYTHON="$(which python3)"
 
 echo "── OLED Guard Updater ──"
 echo ""
+
+# ── 0. Locate repo ──────────────────────────────────────────────────────────────
+# If run from the install dir (not a git repo), navigate to the saved repo path
+if ! git -C "$(pwd)" rev-parse --git-dir &>/dev/null; then
+    REPO_PATH_FILE="$INSTALL_DIR/.repo_path"
+    if [[ ! -f "$REPO_PATH_FILE" ]]; then
+        echo "ERROR: Cannot find the oled-guard repo."
+        echo "  Re-clone it and run: bash install.sh"
+        exit 1
+    fi
+    REPO_DIR="$(cat "$REPO_PATH_FILE")"
+    if [[ ! -d "$REPO_DIR/.git" ]]; then
+        echo "ERROR: Saved repo path '$REPO_DIR' no longer exists."
+        echo "  Re-clone it and run: bash install.sh"
+        exit 1
+    fi
+    echo "→ Using repo at $REPO_DIR"
+    cd "$REPO_DIR"
+fi
 
 # ── 1. Pull latest changes ──────────────────────────────────────────────────────
 echo "→ Fetching latest changes..."
@@ -35,9 +54,9 @@ git pull
 # ── 2. Copy updated scripts ─────────────────────────────────────────────────────
 echo "→ Updating scripts in $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR"
-cp blackout.py watcher.py "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py"
-echo "  ✓ blackout.py and watcher.py updated"
+cp blackout.py watcher.py update.sh "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py" "$INSTALL_DIR/update.sh"
+echo "  ✓ blackout.py, watcher.py, and update.sh updated"
 
 # ── 3. Handle any new files added in this update ────────────────────────────────
 if [[ -n "$NEW_FILES" ]]; then

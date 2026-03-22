@@ -16,8 +16,11 @@ echo ""
 # ── 1. Copy scripts ────────────────────────────────────────────────────────────
 echo "→ Copying scripts to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
-cp blackout.py watcher.py "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py"
+cp blackout.py watcher.py update.sh "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py" "$INSTALL_DIR/update.sh"
+
+# Save the repo path so update.sh can find it when run from the install dir
+echo "$(pwd)" > "$INSTALL_DIR/.repo_path"
 
 # ── 2. Check tkinter ───────────────────────────────────────────────────────────
 echo "→ Checking tkinter..."

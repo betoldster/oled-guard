@@ -168,15 +168,22 @@ If it's not, add `watcher.py` to your compositor's autostart as a workaround.
 Pull the latest changes and apply them in one command:
 
 ```bash
+bash ~/.config/oled-guard/update.sh
+```
+
+Or from the repo directory:
+
+```bash
 bash update.sh
 ```
 
 The updater will:
-1. Fetch and pull the latest commits
-2. Copy updated scripts to `~/.config/oled-guard/`
-3. Detect and install any **new files** added in the update
-4. Reinstall the systemd service unit if it changed
-5. Restart the service automatically
+1. Locate the git repo (uses the path saved during install)
+2. Fetch and pull the latest commits
+3. Copy updated scripts to `~/.config/oled-guard/` (including `update.sh` itself)
+4. Detect and install any **new files** added in the update
+5. Reinstall the systemd service unit if it changed
+6. Restart the service automatically
 
 If you are already on the latest version it exits immediately with no changes.
 
