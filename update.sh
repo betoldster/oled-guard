@@ -99,6 +99,7 @@ fi
 
 # ── 5. Restart the service to apply changes ─────────────────────────────────────
 echo "→ Restarting oled-guard service..."
+systemctl --user reset-failed oled-guard 2>/dev/null || true
 systemctl --user restart oled-guard
 echo "  ✓ Service restarted"
 
