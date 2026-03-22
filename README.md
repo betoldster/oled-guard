@@ -1,13 +1,13 @@
-# 🖤 OLED Guard
+# 🖤 OLED TV Guard
 
-> Burn-in protection for OLED monitors on Wayland Linux — lightweight, instant, and automatic.
+> Burn-in protection for TV OLEDs used as monitors on Wayland Linux — lightweight, instant, and automatic.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Wayland%20Linux-informational?logo=linux&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![systemd](https://img.shields.io/badge/managed%20by-systemd-orange)
 
-Modern Linux desktops have largely dropped traditional screensavers, leaving OLED monitors exposed to static content indefinitely. OLED Guard fills that gap: it watches for inactivity and blanks all screens completely black after a configurable idle timeout. Dismiss it instantly with a click or keypress.
+Modern Linux desktops have largely dropped traditional screensavers, leaving OLED TVs used as PC monitors exposed to static content indefinitely. Unlike dedicated OLED PC monitors, OLED TVs such as LG's OLED lineup have no proper desktop standby mode — instead they start cycling through random images and eventually switch themselves off, constantly interrupting your workflow. OLED Guard fills that gap: it watches for inactivity and blanks all screens completely black after a configurable idle timeout. Dismiss it instantly with a left mouse click.
 
 ---
 
