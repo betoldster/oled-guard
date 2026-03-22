@@ -180,6 +180,7 @@ def main():
                 win.bind(seq, lambda e, r=root: dismiss(r, e))
             all_windows.append(win)
 
+    root.update()
     root.focus_force()
     root.grab_set()
     root.mainloop()
