@@ -19,6 +19,10 @@ mkdir -p "$INSTALL_DIR"
 cp blackout.py watcher.py "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py"
 
+echo "→ Copying management scripts to $INSTALL_DIR"
+cp install.sh uninstall.sh update.sh "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/update.sh"
+
 # ── 2. Check tkinter ───────────────────────────────────────────────────────────
 echo "→ Checking tkinter..."
 if python3 -c "import tkinter" 2>/dev/null; then
@@ -74,7 +78,28 @@ else
         || echo "  WARNING: dbus-python still not importable — watcher may fail."
 fi
 
-# ── 4. Install systemd service ─────────────────────────────────────────────────
+# ── 4. Check xrandr ────────────────────────────────────────────────────────────
+echo "→ Checking xrandr..."
+if command -v xrandr &>/dev/null; then
+    echo "  ✓ xrandr available"
+else
+    echo "  ✗ xrandr missing — installing..."
+    if command -v apt &>/dev/null; then
+        sudo apt install -y x11-xserver-utils || {
+            echo "  WARNING: apt install x11-xserver-utils failed."
+            echo "  Multi-monitor detection will fall back to virtual desktop size."
+        }
+    else
+        echo "  WARNING: Cannot detect package manager. Install xrandr manually:"
+        echo "    sudo apt install x11-xserver-utils"
+        echo "  Multi-monitor detection will fall back to virtual desktop size."
+    fi
+
+    command -v xrandr &>/dev/null && echo "  ✓ xrandr installed" \
+        || echo "  WARNING: xrandr still not found — per-monitor blackout may not work correctly."
+fi
+
+# ── 5. Install systemd service ─────────────────────────────────────────────────
 echo "→ Installing systemd user service..."
 mkdir -p "$SERVICE_DIR"
 cp oled-guard.service "$SERVICE_DIR/$SERVICE_NAME"
@@ -83,7 +108,7 @@ cp oled-guard.service "$SERVICE_DIR/$SERVICE_NAME"
 sed -i "s|/usr/bin/python3|$PYTHON|g" "$SERVICE_DIR/$SERVICE_NAME"
 echo "  ExecStart patched → $PYTHON"
 
-# ── 5. Enable and start ────────────────────────────────────────────────────────
+# ── 6. Enable and start ────────────────────────────────────────────────────────
 echo "→ Enabling and starting oled-guard service..."
 systemctl --user daemon-reload
 systemctl --user enable "$SERVICE_NAME"

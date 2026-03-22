@@ -49,8 +49,9 @@ Idle time is read from the DBus session bus, tried in order:
 - Python 3.10+
 - `python3-tk` — for the blackout window
 - `python3-dbus` — for idle detection
+- `xrandr` (`x11-xserver-utils`) — for accurate per-monitor geometry detection (optional, falls back to virtual desktop)
 
-The installer handles both automatically.
+The installer checks and installs all dependencies automatically.
 
 ---
 
@@ -63,10 +64,11 @@ bash install.sh
 ```
 
 The installer will:
-1. Copy scripts to `~/.config/oled-guard/`
+1. Copy `blackout.py`, `watcher.py`, `install.sh`, `uninstall.sh`, and `update.sh` to `~/.config/oled-guard/`
 2. Install `python3-tk` if missing (supports both Homebrew and apt)
 3. Install `python3-dbus` if missing
-4. Register and start the systemd user service
+4. Install `xrandr` if missing (for accurate per-monitor geometry)
+5. Register and start the systemd user service
 
 ---
 
@@ -129,7 +131,7 @@ dbus-send --session --print-reply --dest=org.freedesktop.DBus \
 
 ### Doesn't cover all monitors
 
-Install `xrandr` for accurate per-monitor geometry detection:
+The installer automatically installs `xrandr` (`x11-xserver-utils`) for per-monitor geometry detection. If it is still missing, install it manually:
 
 ```bash
 sudo apt install x11-xserver-utils
@@ -173,7 +175,7 @@ bash update.sh
 
 The updater will:
 1. Fetch and pull the latest commits
-2. Copy updated scripts to `~/.config/oled-guard/`
+2. Copy updated `blackout.py`, `watcher.py`, `install.sh`, `uninstall.sh`, and `update.sh` to `~/.config/oled-guard/`
 3. Detect and install any **new files** added in the update
 4. Reinstall the systemd service unit if it changed
 5. Restart the service automatically
@@ -184,8 +186,12 @@ If you are already on the latest version it exits immediately with no changes.
 
 ## Uninstall
 
+From the cloned repo directory, or from the installed location:
+
 ```bash
 bash uninstall.sh
+# or, if you no longer have the repo:
+bash ~/.config/oled-guard/uninstall.sh
 ```
 
 ---
