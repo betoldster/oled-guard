@@ -49,7 +49,11 @@ Idle time is read from the DBus session bus, tried in order:
 - Python 3.10+
 - `python3-tk` — for the blackout window
 - `python3-dbus` — for idle detection
-- `xrandr` (`x11-xserver-utils`) — for accurate per-monitor geometry detection (optional, falls back to virtual desktop)
+- One of the following for accurate per-monitor geometry detection (optional, falls back to virtual desktop):
+  - GNOME Wayland: uses `python3-dbus` (already required — no extra tool needed)
+  - wlroots compositors (sway, Hyprland, …): `wlr-randr`
+  - KDE Plasma: `kscreen-doctor` (included with KDE)
+  - X11 / Xwayland fallback: `xrandr` (`x11-xserver-utils`)
 
 The installer checks and installs all dependencies automatically.
 
@@ -67,7 +71,7 @@ The installer will:
 1. Copy `blackout.py`, `watcher.py`, `install.sh`, `uninstall.sh`, and `update.sh` to `~/.config/oled-guard/`
 2. Install `python3-tk` if missing (supports both Homebrew and apt)
 3. Install `python3-dbus` if missing
-4. Install `xrandr` if missing (for accurate per-monitor geometry)
+4. Detect available monitor geometry tools (`wlr-randr`, `kscreen-doctor`, GNOME Mutter DBus, `xrandr`)
 5. Register and start the systemd user service
 
 ---
@@ -131,13 +135,18 @@ dbus-send --session --print-reply --dest=org.freedesktop.DBus \
 
 ### Doesn't cover all monitors
 
-The installer automatically installs `xrandr` (`x11-xserver-utils`) for per-monitor geometry detection. If it is still missing, install it manually:
+`xrandr` (`x11-xserver-utils`) is an **X11 tool** and does not reliably detect individual monitor geometries under native Wayland. OLED Guard now uses Wayland-native detection methods instead, tried in this order:
 
-```bash
-sudo apt install x11-xserver-utils
-```
+| Method | Compositor | What to install |
+|--------|-----------|-----------------|
+| GNOME Mutter DBus | GNOME Wayland | Nothing — uses `python3-dbus` (already required) |
+| `wlr-randr` | sway, Hyprland, wlroots | `sudo apt install wlr-randr` |
+| `kscreen-doctor` | KDE Plasma | Included with KDE |
+| `xrandr` | X11 / Xwayland | `sudo apt install x11-xserver-utils` |
 
-Without it, the fallback mode covers the entire virtual desktop.
+If none of the above are available, the fallback mode covers the entire virtual desktop with a single window.
+
+The installer automatically checks which tools are present and reports what it finds.
 
 ### `No module named '_tkinter'` error
 

@@ -78,23 +78,55 @@ else
         || echo "  WARNING: dbus-python still not importable — watcher may fail."
 fi
 
-# ── 4. Check xrandr ────────────────────────────────────────────────────────────
-echo "→ Checking xrandr..."
+# ── 4. Check monitor geometry detection ────────────────────────────────────────
+echo "→ Checking monitor geometry detection..."
+MONITOR_TOOL_FOUND=false
+
+if command -v wlr-randr &>/dev/null; then
+    echo "  ✓ wlr-randr available (wlroots compositors: sway, Hyprland, …)"
+    MONITOR_TOOL_FOUND=true
+fi
+
+if command -v kscreen-doctor &>/dev/null; then
+    echo "  ✓ kscreen-doctor available (KDE Plasma)"
+    MONITOR_TOOL_FOUND=true
+fi
+
+if python3 -c "
+import dbus, sys
+try:
+    bus = dbus.SessionBus()
+    bus.get_object('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig')
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null; then
+    echo "  ✓ GNOME Mutter DisplayConfig available (GNOME Wayland)"
+    MONITOR_TOOL_FOUND=true
+fi
+
 if command -v xrandr &>/dev/null; then
-    echo "  ✓ xrandr available"
-else
-    echo "  ✗ xrandr missing — installing..."
+    echo "  ✓ xrandr available (X11 / Xwayland fallback)"
+    MONITOR_TOOL_FOUND=true
+fi
+
+if [ "$MONITOR_TOOL_FOUND" = false ]; then
+    echo "  ✗ No monitor detection tool found."
+    echo "  NOTE: xrandr (x11-xserver-utils) is an X11 tool and may not detect"
+    echo "        all monitors under native Wayland. Wayland-native tools are preferred:"
+    echo "    wlroots (sway/Hyprland): sudo apt install wlr-randr"
+    echo "    KDE Plasma:              kscreen-doctor is included with KDE"
+    echo "    GNOME:                   uses DBus (no extra tool needed)"
+    echo "  Falling back to xrandr as a last resort..."
     if command -v apt &>/dev/null; then
         sudo apt install -y x11-xserver-utils || {
             echo "  WARNING: apt install x11-xserver-utils failed."
             echo "  Multi-monitor detection will fall back to virtual desktop size."
         }
     else
-        echo "  WARNING: Cannot detect package manager. Install xrandr manually:"
-        echo "    sudo apt install x11-xserver-utils"
+        echo "  WARNING: Cannot detect package manager."
         echo "  Multi-monitor detection will fall back to virtual desktop size."
     fi
-
     command -v xrandr &>/dev/null && echo "  ✓ xrandr installed" \
         || echo "  WARNING: xrandr still not found — per-monitor blackout may not work correctly."
 fi
