@@ -164,8 +164,6 @@ def main():
     for seq in ("<Button-1>", "<Escape>", "<KeyPress>"):
         root.bind(seq, lambda e, r=root: dismiss(r, e))
 
-    all_windows = [root]
-
     # Build one window per monitor
     for i, mon in enumerate(monitors):
         win = root if i == 0 else tk.Toplevel(root)
@@ -178,7 +176,6 @@ def main():
         if i > 0:
             for seq in ("<Button-1>", "<Escape>", "<KeyPress>"):
                 win.bind(seq, lambda e, r=root: dismiss(r, e))
-            all_windows.append(win)
 
     root.update()
     root.focus_force()
