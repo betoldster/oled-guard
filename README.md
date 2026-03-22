@@ -163,6 +163,21 @@ If it's not, add `watcher.py` to your compositor's autostart as a workaround.
 
 ---
 
+## Updating
+
+From the cloned repo directory:
+
+```bash
+git pull
+bash update.sh
+```
+
+`update.sh` will pull the latest source, copy the updated scripts to
+`~/.config/oled-guard/`, refresh the systemd service file, and restart
+the service — all in one step.
+
+---
+
 ## Uninstall
 
 ```bash
