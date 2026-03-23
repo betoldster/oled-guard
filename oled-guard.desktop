@@ -14,19 +14,19 @@ Actions=start;stop;restart;status;logs;
 
 [Desktop Action start]
 Name=Start Service
-Exec=sh -c '~/.config/oled-guard/oled-guard-term.sh "systemctl --user start oled-guard; echo; systemctl --user status oled-guard --no-pager; echo; echo Press Enter to close...; read"'
+Exec=sh -c '~/.config/oled-guard/oled-guard-term.sh --wait "systemctl --user start oled-guard; echo; systemctl --user status oled-guard --no-pager"'
 
 [Desktop Action stop]
 Name=Stop Service
-Exec=sh -c '~/.config/oled-guard/oled-guard-term.sh "systemctl --user stop oled-guard; echo; systemctl --user status oled-guard --no-pager; echo; echo Press Enter to close...; read"'
+Exec=sh -c '~/.config/oled-guard/oled-guard-term.sh --wait "systemctl --user stop oled-guard; echo; systemctl --user status oled-guard --no-pager"'
 
 [Desktop Action restart]
 Name=Restart Service
-Exec=sh -c '~/.config/oled-guard/oled-guard-term.sh "systemctl --user restart oled-guard; echo; systemctl --user status oled-guard --no-pager; echo; echo Press Enter to close...; read"'
+Exec=sh -c '~/.config/oled-guard/oled-guard-term.sh --wait "systemctl --user restart oled-guard; echo; systemctl --user status oled-guard --no-pager"'
 
 [Desktop Action status]
 Name=Show Status
-Exec=sh -c '~/.config/oled-guard/oled-guard-term.sh "systemctl --user status oled-guard --no-pager; echo; echo Press Enter to close...; read"'
+Exec=sh -c '~/.config/oled-guard/oled-guard-term.sh --wait "systemctl --user status oled-guard --no-pager"'
 
 [Desktop Action logs]
 Name=View Live Logs
