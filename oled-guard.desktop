@@ -1,0 +1,33 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=OLED Guard
+GenericName=OLED Burn-in Protection
+Comment=Trigger a fullscreen blackout to protect OLED screens from burn-in
+Icon=oled-guard
+Categories=System;Utility;
+Keywords=oled;burn-in;screensaver;blackout;screen;monitor;
+Terminal=false
+Exec=python3 ~/.config/oled-guard/blackout.py
+
+Actions=start;stop;restart;status;logs;
+
+[Desktop Action start]
+Name=Start Service
+Exec=systemctl --user start oled-guard
+
+[Desktop Action stop]
+Name=Stop Service
+Exec=systemctl --user stop oled-guard
+
+[Desktop Action restart]
+Name=Restart Service
+Exec=systemctl --user restart oled-guard
+
+[Desktop Action status]
+Name=Show Status
+Exec=sh -c 'systemctl --user status oled-guard --no-pager; echo; echo "Press Enter to close..."; read'
+
+[Desktop Action logs]
+Name=View Live Logs
+Exec=sh -c 'journalctl --user -u oled-guard -f'
