@@ -40,7 +40,7 @@ REMOTE=$(git rev-parse @{u} 2>/dev/null || echo "")
 
 if [[ -z "$REMOTE" ]]; then
     echo "  WARNING: No upstream branch tracked. Run 'git pull' manually."
-elif [[ "$LOCAL" == "$REMOTE" ]]; then
+elif [[ "$LOCAL" == "$REMOTE" && -z "${OLED_GUARD_REEXEC:-}" ]]; then
     echo "  ✓ Already up to date — nothing to do."
     exit 0
 fi
@@ -50,6 +50,12 @@ NEW_FILES=$(git diff --name-only --diff-filter=A HEAD @{u} 2>/dev/null || true)
 
 echo "→ Pulling changes..."
 git pull
+
+# Re-exec if update.sh itself changed, so new logic runs immediately
+if [[ -z "${OLED_GUARD_REEXEC:-}" ]] && git diff --name-only HEAD@{1} HEAD 2>/dev/null | grep -q '^update\.sh$'; then
+    echo "→ update.sh changed — re-running updated version..."
+    OLED_GUARD_REEXEC=1 exec bash "$PWD/update.sh"
+fi
 
 # ── 2. Copy updated scripts ─────────────────────────────────────────────────────
 echo "→ Updating scripts in $INSTALL_DIR..."
@@ -69,6 +75,9 @@ if [[ -f oled-guard.svg ]]; then
     mkdir -p "$HOME/.local/share/icons/hicolor/scalable/apps"
     cp oled-guard.svg "$HOME/.local/share/icons/hicolor/scalable/apps/oled-guard.svg"
 fi
+# Refresh caches (best-effort)
+gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 
 # ── 3. Handle any new files added in this update ────────────────────────────────
 if [[ -n "$NEW_FILES" ]]; then
