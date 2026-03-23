@@ -9,6 +9,8 @@
 
 Modern Linux desktops have largely dropped traditional screensavers, leaving OLED TVs used as PC monitors exposed to static content indefinitely. Unlike dedicated OLED PC monitors, OLED TVs such as LG's OLED lineup have no proper desktop standby mode — instead they start cycling through random images and eventually switch themselves off, constantly interrupting your workflow. OLED Guard fills that gap: it watches for inactivity and blanks all screens completely black after a configurable idle timeout. Dismiss it instantly with a left mouse click.
 
+Due to the nature of OLED, a fully black screen draws very little power — though it is not the most power-efficient solution compared to a true display-off state. I built this app primarily to reduce the risk of burn-in from static elements like taskbars and desktop icons. It lets me step away from my desk without having to think about it.
+
 ---
 
 ## Features
