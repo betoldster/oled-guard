@@ -16,7 +16,7 @@ Due to the nature of OLED, a fully black screen draws very little power - though
 ## Features
 
 - 🖥️ **Multi-monitor** — covers every connected display simultaneously
-- ⚡ **Instant dismiss** — left click, `ESC`, or any key closes it immediately
+- ⚡ **Instant dismiss** — left click closes it immediately
 - 🔋 **Near-zero resource usage** — sleeping daemon + blocking event wait
 - 🔌 **Auto-starts on login** — managed as a systemd user service
 - 🧩 **Wayland-native** — idle detection via DBus (GNOME, KDE, and others)
