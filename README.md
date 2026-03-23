@@ -21,6 +21,7 @@ Due to the nature of OLED, a fully black screen draws very little power - though
 - 🔌 **Auto-starts on login** — managed as a systemd user service
 - 🧩 **Wayland-native** — idle detection via DBus (GNOME, KDE, and others)
 - 📦 **Minimal dependencies** — `python3-dbus` + `tkinter` (usually pre-installed)
+- 🖱️ **App menu shortcut** — appears in GNOME, KDE, and other freedesktop-compliant app launchers with right-click actions for service management
 
 ---
 
@@ -74,7 +75,8 @@ The installer will:
 2. Install `python3-tk` if missing (supports both Homebrew and apt)
 3. Install `python3-dbus` if missing
 4. Detect available monitor geometry tools (`wlr-randr`, `kscreen-doctor`, GNOME Mutter DBus, `xrandr`)
-5. Register and start the systemd user service
+5. Install desktop entry and icon to `~/.local/share/applications/` and `~/.local/share/icons/`
+6. Register and start the systemd user service
 
 ---
 

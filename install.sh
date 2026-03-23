@@ -16,7 +16,8 @@ echo ""
 # ── 1. Copy scripts ────────────────────────────────────────────────────────────
 echo "→ Copying scripts to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
-cp blackout.py watcher.py install.sh uninstall.sh update.sh "$INSTALL_DIR/"
+cp blackout.py watcher.py install.sh uninstall.sh update.sh \
+   oled-guard.desktop oled-guard.svg "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py" \
          "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/update.sh"
 
@@ -157,7 +158,19 @@ if [[ -n "${SYS_DBUS_PATH:-}" ]]; then
     echo "  Service patched → PYTHONPATH=$SYS_DBUS_PATH (system dbus-python)"
 fi
 
-# ── 6. Enable and start ────────────────────────────────────────────────────────
+# ── 6. Install desktop entry and icon ─────────────────────────────────────────
+echo "→ Installing desktop entry..."
+DESKTOP_DIR="$HOME/.local/share/applications"
+ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+mkdir -p "$DESKTOP_DIR" "$ICON_DIR"
+cp oled-guard.desktop "$DESKTOP_DIR/oled-guard.desktop"
+cp oled-guard.svg "$ICON_DIR/oled-guard.svg"
+# Refresh caches (best-effort)
+gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+echo "  ✓ Desktop entry installed"
+
+# ── 7. Enable and start ────────────────────────────────────────────────────────
 echo "→ Enabling and starting oled-guard service..."
 systemctl --user daemon-reload
 systemctl --user enable "$SERVICE_NAME"

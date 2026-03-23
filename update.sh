@@ -54,10 +54,21 @@ git pull
 # ── 2. Copy updated scripts ─────────────────────────────────────────────────────
 echo "→ Updating scripts in $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR"
-cp blackout.py watcher.py install.sh uninstall.sh update.sh "$INSTALL_DIR/"
+cp blackout.py watcher.py install.sh uninstall.sh update.sh \
+   oled-guard.desktop oled-guard.svg "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py" \
          "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/update.sh"
 echo "  ✓ Scripts updated"
+
+# Copy desktop entry and icon if present
+if [[ -f oled-guard.desktop ]]; then
+    mkdir -p "$HOME/.local/share/applications"
+    cp oled-guard.desktop "$HOME/.local/share/applications/oled-guard.desktop"
+fi
+if [[ -f oled-guard.svg ]]; then
+    mkdir -p "$HOME/.local/share/icons/hicolor/scalable/apps"
+    cp oled-guard.svg "$HOME/.local/share/icons/hicolor/scalable/apps/oled-guard.svg"
+fi
 
 # ── 3. Handle any new files added in this update ────────────────────────────────
 if [[ -n "$NEW_FILES" ]]; then
