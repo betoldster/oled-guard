@@ -27,18 +27,20 @@ IDLE_THRESHOLD_SECONDS = 5 * 60  # 5 minutes
 # How often to check idle time (seconds)
 POLL_INTERVAL_SECONDS = 15
 
-# How to detect "video is playing" so the blackout is skipped:
-#   "strict"    — an idle inhibitor is active AND an MPRIS player is "Playing".
-#                 Browsers (YouTube) and video players do both; apps that hold
-#                 an inhibitor permanently (Steam, Discord, ...) play nothing,
-#                 and music players do not inhibit — both still blank.
-#   "inhibitor" — any idle inhibitor. Also blocked by leaked inhibitors.
-#   "mpris"     — any MPRIS player "Playing". Also blocked by audio-only.
-#   "off"       — pure idle timer, never skip.
-VIDEO_DETECTION = "strict"
+# Skip the blackout while an app blocks session idle. Video players and
+# browsers do this only while a video plays (Brave/Chromium "Video Wake Lock",
+# Firefox, VLC, mpv, ...); audio-only playback does not. Idle time itself is
+# raw keyboard/mouse idle, so a truly idle desktop still blanks.
+RESPECT_IDLE_INHIBITORS = True
 
-# Safety cap: blank anyway after this much idle time, even if something is
-# video is detected. Protects against a player left running in a loop.
+# Inhibitors to ignore, matched case-insensitively as substrings of the app id
+# (see `watcher.py --check`), e.g. ["steam", "discord"]. Use this if an app
+# blocks idle permanently. Wayland-protocol inhibitors all show up as "mutter"
+# on GNOME, and KDE reports no app ids, so those cannot be filtered per app.
+IGNORE_INHIBITORS: list[str] = []
+
+# Safety cap: blank anyway after this much idle time, even while an inhibitor
+# is active. Protects against a video left looping or a stuck inhibitor.
 # 0 disables the cap.
 MAX_INHIBITED_IDLE_SECONDS = 4 * 60 * 60  # 4 hours
 
@@ -106,17 +108,17 @@ def get_idle_seconds() -> float:
         log.error(f"DBus error: {e}")
         return 0.0
 
-# ── Idle inhibitor / playback detection ────────────────────────────────────────
+# ── Idle inhibitor detection ───────────────────────────────────────────────────
 
-# GsmInhibitorFlag: 8 = inhibit session idle
+# GsmInhibitorFlag: 8 = inhibit session idle (4 = suspend, e.g. "Playing audio")
 _GSM_INHIBIT_IDLE = 8
 
 
 def _gnome_session_inhibitors(bus) -> list[str] | None:
     """
-    GNOME: gnome-session tracks idle inhibitors from org.gnome.SessionManager,
-    the Inhibit portal and Mutter's Wayland idle-inhibit protocol.
-    Returns app ids of idle inhibitors, or None if gnome-session is absent.
+    GNOME: gnome-session tracks idle inhibitors from its own API, the Inhibit
+    portal and Mutter's Wayland idle-inhibit protocol (app id "mutter").
+    Returns "app (reason)" per idle inhibitor, or None if gnome-session is absent.
     """
     import dbus
     try:
@@ -124,22 +126,21 @@ def _gnome_session_inhibitors(bus) -> list[str] | None:
             bus.get_object("org.gnome.SessionManager", "/org/gnome/SessionManager"),
             "org.gnome.SessionManager",
         )
-        if not sm.IsInhibited(dbus.UInt32(_GSM_INHIBIT_IDLE)):
-            return []
-        apps = []
-        for path in sm.GetInhibitors():
-            try:
-                inh = dbus.Interface(
-                    bus.get_object("org.gnome.SessionManager", path),
-                    "org.gnome.SessionManager.Inhibitor",
-                )
-                if int(inh.GetFlags()) & _GSM_INHIBIT_IDLE:
-                    apps.append(f"{inh.GetAppId() or '?'} ({inh.GetReason() or 'no reason'})")
-            except dbus.DBusException:
-                continue
-        return apps or ["unknown app"]
+        paths = sm.GetInhibitors()
     except dbus.DBusException:
         return None
+    apps = []
+    for path in paths:
+        try:
+            inh = dbus.Interface(
+                bus.get_object("org.gnome.SessionManager", path),
+                "org.gnome.SessionManager.Inhibitor",
+            )
+            if int(inh.GetFlags()) & _GSM_INHIBIT_IDLE:
+                apps.append(f"{inh.GetAppId() or '?'} ({inh.GetReason() or 'no reason'})")
+        except dbus.DBusException:
+            continue
+    return apps
 
 
 def _kde_inhibitors(bus) -> list[str] | None:
@@ -178,35 +179,18 @@ def _logind_idle_inhibitors() -> list[str]:
         return []
 
 
-def _mpris_playing(bus) -> list[str]:
-    """Names of MPRIS players currently in PlaybackStatus 'Playing'."""
-    import dbus
-    playing = []
-    try:
-        names = bus.list_names()
-    except dbus.DBusException:
-        return playing
-    for name in names:
-        if not str(name).startswith("org.mpris.MediaPlayer2."):
-            continue
-        try:
-            props = dbus.Interface(
-                bus.get_object(name, "/org/mpris/MediaPlayer2"),
-                "org.freedesktop.DBus.Properties",
-            )
-            status = props.Get("org.mpris.MediaPlayer2.Player", "PlaybackStatus")
-            if status == "Playing":
-                playing.append(str(name).removeprefix("org.mpris.MediaPlayer2."))
-        except dbus.DBusException:
-            continue
-    return playing
+def _ignored(inhibitor: str) -> bool:
+    name = inhibitor.lower()
+    return any(pat.lower() in name for pat in IGNORE_INHIBITORS)
 
 
 def get_blackout_blockers() -> list[str]:
     """
-    Return human-readable reasons why the blackout should be skipped right now
+    Return the idle inhibitors that should prevent the blackout right now
     (empty list = nothing is blocking).
     """
+    if not RESPECT_IDLE_INHIBITORS:
+        return []
     try:
         import dbus
         bus = dbus.SessionBus()
@@ -214,25 +198,11 @@ def get_blackout_blockers() -> list[str]:
         log.error(f"DBus error: {e}")
         return []
 
-    if VIDEO_DETECTION == "off":
-        return []
-
-    inhibitors: list[str] = []
-    if VIDEO_DETECTION in ("strict", "inhibitor"):
-        for probe in (_gnome_session_inhibitors, _kde_inhibitors):
-            found = probe(bus)
-            if found is not None:
-                inhibitors += [f"inhibitor: {a}" for a in found]
-        inhibitors += [f"logind inhibitor: {a}" for a in _logind_idle_inhibitors()]
-        if VIDEO_DETECTION == "inhibitor":
-            return inhibitors
-        if not inhibitors:
-            return []
-
-    playing = [f"playing: {p}" for p in _mpris_playing(bus)]
-    if VIDEO_DETECTION == "strict" and not playing:
-        return []
-    return inhibitors + playing
+    found: list[str] = []
+    for probe in (_gnome_session_inhibitors, _kde_inhibitors):
+        found += probe(bus) or []
+    found += _logind_idle_inhibitors()
+    return [i for i in found if not _ignored(i)]
 
 # ── Blackout process ───────────────────────────────────────────────────────────
 
@@ -292,8 +262,8 @@ def main():
     log.info(
         f"Started. Threshold: {IDLE_THRESHOLD_SECONDS}s, "
         f"poll every {POLL_INTERVAL_SECONDS}s, "
-        f"video detection: {VIDEO_DETECTION}, "
-        f"cap: {MAX_INHIBITED_IDLE_SECONDS}s."
+        f"respect inhibitors: {RESPECT_IDLE_INHIBITORS}, "
+        f"ignore: {IGNORE_INHIBITORS}, cap: {MAX_INHIBITED_IDLE_SECONDS}s."
     )
     last_blockers: list[str] = []
     while True:
@@ -308,7 +278,7 @@ def main():
                     log.info(f"Idle {int(idle)}s but blackout skipped — {'; '.join(blockers)}")
             else:
                 if capped:
-                    log.info("Cap reached — blanking despite video playback.")
+                    log.info("Cap reached — blanking despite active inhibitors.")
                 launch_blackout()
         last_blockers = blockers
         time.sleep(POLL_INTERVAL_SECONDS)
@@ -319,6 +289,8 @@ def check():
     print(f"idle: {get_idle_seconds():.0f}s (threshold {IDLE_THRESHOLD_SECONDS}s)")
     blockers = get_blackout_blockers()
     print("blockers:", "; ".join(blockers) if blockers else "none")
+    if IGNORE_INHIBITORS:
+        print("ignoring:", ", ".join(IGNORE_INHIBITORS))
 
 
 if __name__ == "__main__":
