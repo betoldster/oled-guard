@@ -27,18 +27,18 @@ IDLE_THRESHOLD_SECONDS = 5 * 60  # 5 minutes
 # How often to check idle time (seconds)
 POLL_INTERVAL_SECONDS = 15
 
-# Skip the blackout while an app holds an idle inhibitor. Browsers (Firefox,
-# Chromium) and video players (mpv, VLC, ...) set one while a video is playing,
-# e.g. YouTube, so watching without touching the mouse does not blank the screen.
-RESPECT_IDLE_INHIBITORS = True
-
-# Also skip the blackout while any MPRIS media player reports "Playing".
-# Catches players that do not set an inhibitor, but MPRIS cannot tell video
-# from audio: music playing on a static desktop would then never blank.
-RESPECT_MPRIS_PLAYBACK = False
+# How to detect "video is playing" so the blackout is skipped:
+#   "strict"    — an idle inhibitor is active AND an MPRIS player is "Playing".
+#                 Browsers (YouTube) and video players do both; apps that hold
+#                 an inhibitor permanently (Steam, Discord, ...) play nothing,
+#                 and music players do not inhibit — both still blank.
+#   "inhibitor" — any idle inhibitor. Also blocked by leaked inhibitors.
+#   "mpris"     — any MPRIS player "Playing". Also blocked by audio-only.
+#   "off"       — pure idle timer, never skip.
+VIDEO_DETECTION = "strict"
 
 # Safety cap: blank anyway after this much idle time, even if something is
-# inhibiting. Protects against apps that leak inhibitors (games, chat clients).
+# video is detected. Protects against a player left running in a loop.
 # 0 disables the cap.
 MAX_INHIBITED_IDLE_SECONDS = 4 * 60 * 60  # 4 hours
 
@@ -214,16 +214,25 @@ def get_blackout_blockers() -> list[str]:
         log.error(f"DBus error: {e}")
         return []
 
-    reasons: list[str] = []
-    if RESPECT_IDLE_INHIBITORS:
+    if VIDEO_DETECTION == "off":
+        return []
+
+    inhibitors: list[str] = []
+    if VIDEO_DETECTION in ("strict", "inhibitor"):
         for probe in (_gnome_session_inhibitors, _kde_inhibitors):
             found = probe(bus)
             if found is not None:
-                reasons += [f"inhibitor: {a}" for a in found]
-        reasons += [f"logind inhibitor: {a}" for a in _logind_idle_inhibitors()]
-    if RESPECT_MPRIS_PLAYBACK:
-        reasons += [f"playing: {p}" for p in _mpris_playing(bus)]
-    return reasons
+                inhibitors += [f"inhibitor: {a}" for a in found]
+        inhibitors += [f"logind inhibitor: {a}" for a in _logind_idle_inhibitors()]
+        if VIDEO_DETECTION == "inhibitor":
+            return inhibitors
+        if not inhibitors:
+            return []
+
+    playing = [f"playing: {p}" for p in _mpris_playing(bus)]
+    if VIDEO_DETECTION == "strict" and not playing:
+        return []
+    return inhibitors + playing
 
 # ── Blackout process ───────────────────────────────────────────────────────────
 
@@ -283,8 +292,8 @@ def main():
     log.info(
         f"Started. Threshold: {IDLE_THRESHOLD_SECONDS}s, "
         f"poll every {POLL_INTERVAL_SECONDS}s, "
-        f"inhibitors: {RESPECT_IDLE_INHIBITORS}, mpris: {RESPECT_MPRIS_PLAYBACK}, "
-        f"inhibit cap: {MAX_INHIBITED_IDLE_SECONDS}s."
+        f"video detection: {VIDEO_DETECTION}, "
+        f"cap: {MAX_INHIBITED_IDLE_SECONDS}s."
     )
     last_blockers: list[str] = []
     while True:
@@ -299,7 +308,7 @@ def main():
                     log.info(f"Idle {int(idle)}s but blackout skipped — {'; '.join(blockers)}")
             else:
                 if capped:
-                    log.info("Inhibit cap reached — blanking despite inhibitors.")
+                    log.info("Cap reached — blanking despite video playback.")
                 launch_blackout()
         last_blockers = blockers
         time.sleep(POLL_INTERVAL_SECONDS)
