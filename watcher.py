@@ -20,6 +20,13 @@ import logging
 import subprocess
 
 # ── Configuration ──────────────────────────────────────────────────────────────
+# Defaults. Override them in ~/.config/oled-guard/config.ini (see
+# config.example.ini) — that file is never touched by update.sh.
+
+CONFIG_FILE = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+    "oled-guard", "config.ini",
+)
 
 # How long (seconds) of idle before blackout triggers
 IDLE_THRESHOLD_SECONDS = 5 * 60  # 5 minutes
@@ -57,6 +64,44 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("oled-guard")
+
+# ── Config file ────────────────────────────────────────────────────────────────
+
+def load_config():
+    """Apply overrides from CONFIG_FILE. Invalid values keep their default."""
+    import configparser
+    global IDLE_THRESHOLD_SECONDS, POLL_INTERVAL_SECONDS
+    global RESPECT_IDLE_INHIBITORS, IGNORE_INHIBITORS, MAX_INHIBITED_IDLE_SECONDS
+
+    cp = configparser.ConfigParser()
+    try:
+        if not cp.read(CONFIG_FILE):
+            log.info(f"No config at {CONFIG_FILE} — using defaults.")
+            return
+    except configparser.Error as e:
+        log.error(f"Cannot parse {CONFIG_FILE}: {e} — using defaults.")
+        return
+    if not cp.has_section("oled-guard"):
+        log.warning(f"{CONFIG_FILE} has no [oled-guard] section — using defaults.")
+        return
+    c = cp["oled-guard"]
+
+    def get(key, conv, default):
+        try:
+            return conv(key, fallback=default)
+        except ValueError as e:
+            log.error(f"config: invalid {key}: {e} — using default {default!r}.")
+            return default
+
+    IDLE_THRESHOLD_SECONDS = max(1, get("idle_threshold_seconds", c.getint, IDLE_THRESHOLD_SECONDS))
+    POLL_INTERVAL_SECONDS = max(1, get("poll_interval_seconds", c.getint, POLL_INTERVAL_SECONDS))
+    RESPECT_IDLE_INHIBITORS = get("respect_idle_inhibitors", c.getboolean, RESPECT_IDLE_INHIBITORS)
+    MAX_INHIBITED_IDLE_SECONDS = max(0, get("max_inhibited_idle_seconds", c.getint,
+                                            MAX_INHIBITED_IDLE_SECONDS))
+    ignore = c.get("ignore_inhibitors", fallback=None)
+    if ignore is not None:
+        IGNORE_INHIBITORS = [x.strip() for x in ignore.split(",") if x.strip()]
+    log.info(f"Loaded config from {CONFIG_FILE}.")
 
 # ── Idle time via DBus ─────────────────────────────────────────────────────────
 
@@ -259,6 +304,7 @@ def main():
         )
         sys.exit(1)
 
+    load_config()
     log.info(
         f"Started. Threshold: {IDLE_THRESHOLD_SECONDS}s, "
         f"poll every {POLL_INTERVAL_SECONDS}s, "
@@ -286,6 +332,7 @@ def main():
 
 def check():
     """One-shot diagnostic: print idle time and current blockers, then exit."""
+    load_config()
     print(f"idle: {get_idle_seconds():.0f}s (threshold {IDLE_THRESHOLD_SECONDS}s)")
     blockers = get_blackout_blockers()
     print("blockers:", "; ".join(blockers) if blockers else "none")

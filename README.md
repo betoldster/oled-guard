@@ -67,9 +67,9 @@ blanks, even with Steam, Discord etc. running in the background.
 | Video playing (fullscreen or visible window), mouse untouched | stays on |
 | Video paused, minimized or in a background tab | blanks |
 | Music only (browser "Playing audio" inhibits suspend, not idle) | blanks |
-| App that blocks idle permanently | stays on → add it to `IGNORE_INHIBITORS` |
+| App that blocks idle permanently | stays on → add it to `ignore_inhibitors` |
 
-After `MAX_INHIBITED_IDLE_SECONDS` (default 4 h) of idle it blanks anyway.
+After `max_inhibited_idle_seconds` (default 4 h) of idle it blanks anyway.
 
 Check what OLED Guard sees right now (e.g. with a YouTube video running):
 
@@ -104,7 +104,7 @@ bash install.sh
 ```
 
 The installer will:
-1. Copy all scripts to `~/.config/oled-guard/`
+1. Copy all scripts to `~/.config/oled-guard/` and create `config.ini` there (only if it does not exist yet)
 2. Install `python3-tk` if missing (supports both Homebrew and apt)
 3. Install `python3-dbus` if missing
 4. Detect available monitor geometry tools (`wlr-randr`, `kscreen-doctor`, GNOME Mutter DBus, `xrandr`)
@@ -137,23 +137,35 @@ Press `ESC`, click, or press any key to dismiss.
 
 ## Configuration
 
-Edit `~/.config/oled-guard/watcher.py`:
+Settings live in `~/.config/oled-guard/config.ini`. The installer creates it
+from [`config.example.ini`](config.example.ini) with every option commented
+out, so the built-in defaults apply. Uncomment a line to override it.
+`update.sh` never overwrites this file.
 
-```python
-# Idle timeout before blackout (default: 5 minutes)
-IDLE_THRESHOLD_SECONDS = 5 * 60
+```ini
+[oled-guard]
 
-# How often to poll for idle time (default: 15 seconds)
-POLL_INTERVAL_SECONDS = 15
+# Idle time (seconds) before the screens go black
+#idle_threshold_seconds = 300
 
-# Skip blackout while an app blocks idle (video playing)
-RESPECT_IDLE_INHIBITORS = True
+# How often idle time is checked (seconds)
+#poll_interval_seconds = 15
 
-# App ids to ignore (case-insensitive substring), e.g. ["steam", "discord"]
-IGNORE_INHIBITORS = []
+# Stay on while an app blocks idle (video playing). yes/no
+#respect_idle_inhibitors = yes
 
-# Blank anyway after this much idle time despite inhibitors (0 = never)
-MAX_INHIBITED_IDLE_SECONDS = 4 * 60 * 60
+# Comma-separated app ids to ignore (case-insensitive substring)
+#ignore_inhibitors = steam, discord
+
+# Blank anyway after this much idle despite inhibitors (0 = never)
+#max_inhibited_idle_seconds = 14400
+```
+
+Invalid values are logged and replaced by their default, so a typo never stops
+the service. Check the result in the startup line of the log:
+
+```bash
+journalctl --user -u oled-guard -n 5
 ```
 
 Then restart the service:
@@ -189,7 +201,7 @@ Check its settings (mpv: `stop-screensaver=yes`, the default).
 
 `journalctl --user -u oled-guard` logs `blackout skipped — …` with the app
 holding the inhibitor; `watcher.py --check` shows it as well. Add a matching
-part of its app id to `IGNORE_INHIBITORS`.
+part of its app id to `ignore_inhibitors` in `config.ini`.
 
 ### Doesn't cover all monitors
 
@@ -259,7 +271,8 @@ bash update.sh
 
 `update.sh` will:
 1. Pull the latest source (`git pull`)
-2. Copy updated scripts to `~/.config/oled-guard/`
+2. Copy updated scripts to `~/.config/oled-guard/` (your `config.ini` is kept;
+   it is only created if missing)
 3. Refresh and re-patch the systemd service file
 4. Reload systemd and restart the service
 
@@ -274,6 +287,9 @@ bash uninstall.sh
 # or, if you no longer have the repo:
 bash ~/.config/oled-guard/uninstall.sh
 ```
+
+This removes `~/.config/oled-guard/` including `config.ini` — back it up first
+if you want to keep your settings.
 
 ---
 

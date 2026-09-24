@@ -17,10 +17,18 @@ echo ""
 echo "→ Copying scripts to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 cp blackout.py watcher.py install.sh uninstall.sh update.sh \
-   oled-guard.desktop oled-guard.svg oled-guard-term.sh "$INSTALL_DIR/"
+   oled-guard.desktop oled-guard.svg oled-guard-term.sh config.example.ini "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/blackout.py" "$INSTALL_DIR/watcher.py" \
          "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstall.sh" "$INSTALL_DIR/update.sh" \
          "$INSTALL_DIR/oled-guard-term.sh"
+
+# Create the user config once; never overwrite an existing one
+if [[ ! -f "$INSTALL_DIR/config.ini" ]]; then
+    cp config.example.ini "$INSTALL_DIR/config.ini"
+    echo "  ✓ Created $INSTALL_DIR/config.ini"
+else
+    echo "  ✓ Keeping existing $INSTALL_DIR/config.ini"
+fi
 
 # Save the repo path so update.sh can find it when run from the install dir
 echo "$(pwd)" > "$INSTALL_DIR/.repo_path"
@@ -183,5 +191,6 @@ echo ""
 echo "Useful commands:"
 echo "  systemctl --user status oled-guard        # check status"
 echo "  journalctl --user -u oled-guard -f        # live logs"
+echo "  \$EDITOR ~/.config/oled-guard/config.ini   # settings"
 echo "  systemctl --user restart oled-guard       # restart after config changes"
 echo "  python3 ~/.config/oled-guard/blackout.py  # test blackout manually"
