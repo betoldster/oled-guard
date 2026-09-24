@@ -16,6 +16,7 @@ Due to the nature of OLED, a fully black screen draws very little power - though
 ## Features
 
 - 🖥️ **Multi-monitor** — covers every connected display simultaneously
+- 🎬 **Video-aware** — no blackout while YouTube, mpv, VLC & co. are playing video (idle inhibitors)
 - ⚡ **Instant dismiss** — left click closes it immediately
 - 🔋 **Near-zero resource usage** — sleeping daemon + blocking event wait
 - 🔌 **Auto-starts on login** — managed as a systemd user service
@@ -30,7 +31,7 @@ Due to the nature of OLED, a fully black screen draws very little power - though
 ```
 watcher.py        (always running, ~6 MB RAM, <0.1% CPU)
     │  polls DBus for idle time every 15 s
-    │  after 5 min idle ──►
+    │  after 5 min idle ──► any idle inhibitor active (video playing)? ──► skip
     └─► blackout.py        (active only while blanked, ~12 MB RAM, 0% CPU)
             one fullscreen black window per monitor
             exits instantly on click or any keypress
@@ -43,6 +44,29 @@ Idle time is read from the DBus session bus, tried in order:
 | `org.gnome.Mutter.IdleMonitor` | GNOME, PikaOS |
 | `org.freedesktop.ScreenSaver` | KDE Plasma, generic |
 | `org.kde.screensaver` | KDE fallback |
+
+### Video playback (YouTube etc.)
+
+Browsers and video players register an *idle inhibitor* while a video is
+playing — the same mechanism that stops the screen from locking. When the idle
+threshold is reached, OLED Guard checks for one and skips the blackout:
+
+| Source | Compositor | Covers |
+|--------|-----------|--------|
+| `org.gnome.SessionManager` (idle flag) | GNOME | Wayland idle-inhibit protocol, portal, GNOME inhibit API |
+| `org.freedesktop.PowerManagement.Inhibit` | KDE Plasma | `org.freedesktop.ScreenSaver.Inhibit`, portal |
+| `org.freedesktop.login1` idle inhibitors | any | `systemd-inhibit --what=idle` |
+| MPRIS `PlaybackStatus` (opt-in) | any | any MPRIS player, **including audio-only** |
+
+Firefox and Chromium only inhibit for *video* playback, so music on a static
+desktop still blanks. After `MAX_INHIBITED_IDLE_SECONDS` (default 4 h) of idle
+it blanks anyway, in case an app leaks an inhibitor.
+
+Check what OLED Guard sees right now (e.g. with a YouTube video running):
+
+```bash
+python3 ~/.config/oled-guard/watcher.py --check
+```
 
 ---
 
@@ -112,6 +136,15 @@ IDLE_THRESHOLD_SECONDS = 5 * 60
 
 # How often to poll for idle time (default: 15 seconds)
 POLL_INTERVAL_SECONDS = 15
+
+# Skip blackout while an app holds an idle inhibitor (video playing)
+RESPECT_IDLE_INHIBITORS = True
+
+# Also skip while any MPRIS player is "Playing" (also matches audio-only!)
+RESPECT_MPRIS_PLAYBACK = False
+
+# Blank anyway after this much idle time despite inhibitors (0 = never)
+MAX_INHIBITED_IDLE_SECONDS = 4 * 60 * 60
 ```
 
 Then restart the service:
@@ -136,6 +169,18 @@ If you see `No idle-time DBus interface found`, your compositor uses a different
 dbus-send --session --print-reply --dest=org.freedesktop.DBus \
   /org/freedesktop/DBus org.freedesktop.DBus.ListNames
 ```
+
+### Blackout triggers during videos
+
+Run `python3 ~/.config/oled-guard/watcher.py --check` while the video plays.
+If it reports `blockers: none`, your browser/compositor combination does not
+expose an inhibitor OLED Guard can query (e.g. a Wayland-protocol-only
+inhibitor on KDE). Set `RESPECT_MPRIS_PLAYBACK = True` as a fallback.
+
+### Blackout never triggers (inhibitor)
+
+`journalctl --user -u oled-guard` logs `blackout skipped — …` with the app
+holding the inhibitor. On GNOME also: `gnome-session-inhibit --list`.
 
 ### Doesn't cover all monitors
 
