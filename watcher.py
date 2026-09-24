@@ -159,11 +159,11 @@ def get_idle_seconds() -> float:
 _GSM_INHIBIT_IDLE = 8
 
 
-def _gnome_session_inhibitors(bus) -> list[str] | None:
+def _gnome_session_inhibitors(bus) -> list[tuple[str, str]] | None:
     """
     GNOME: gnome-session tracks idle inhibitors from its own API, the Inhibit
     portal and Mutter's Wayland idle-inhibit protocol (app id "mutter").
-    Returns "app (reason)" per idle inhibitor, or None if gnome-session is absent.
+    Returns (app id, reason) per idle inhibitor, or None if gnome-session is absent.
     """
     import dbus
     try:
@@ -182,16 +182,16 @@ def _gnome_session_inhibitors(bus) -> list[str] | None:
                 "org.gnome.SessionManager.Inhibitor",
             )
             if int(inh.GetFlags()) & _GSM_INHIBIT_IDLE:
-                apps.append(f"{inh.GetAppId() or '?'} ({inh.GetReason() or 'no reason'})")
+                apps.append((str(inh.GetAppId() or "?"), str(inh.GetReason() or "no reason")))
         except dbus.DBusException:
             continue
     return apps
 
 
-def _kde_inhibitors(bus) -> list[str] | None:
+def _kde_inhibitors(bus) -> list[tuple[str, str]] | None:
     """
     KDE Plasma: PowerDevil collects org.freedesktop.ScreenSaver.Inhibit and
-    portal inhibitions. Returns None if PowerDevil is absent.
+    portal inhibitions, but reports no app ids. Returns None if PowerDevil is absent.
     """
     import dbus
     try:
@@ -200,12 +200,12 @@ def _kde_inhibitors(bus) -> list[str] | None:
                            "/org/freedesktop/PowerManagement/Inhibit"),
             "org.freedesktop.PowerManagement.Inhibit",
         )
-        return ["PowerManagement inhibitor"] if pm.HasInhibit() else []
+        return [("PowerManagement", "inhibitor active")] if pm.HasInhibit() else []
     except dbus.DBusException:
         return None
 
 
-def _logind_idle_inhibitors() -> list[str]:
+def _logind_idle_inhibitors() -> list[tuple[str, str]]:
     """Any compositor: blocking 'idle' inhibitors registered with systemd-logind."""
     import dbus
     try:
@@ -216,7 +216,7 @@ def _logind_idle_inhibitors() -> list[str]:
         )
         uid = os.getuid()
         return [
-            f"{who} ({why})"
+            (str(who), str(why))
             for what, who, why, mode, inh_uid, _pid in login1.ListInhibitors()
             if "idle" in str(what).split(":") and mode == "block" and int(inh_uid) == uid
         ]
@@ -224,9 +224,10 @@ def _logind_idle_inhibitors() -> list[str]:
         return []
 
 
-def _ignored(inhibitor: str) -> bool:
-    name = inhibitor.lower()
-    return any(pat.lower() in name for pat in IGNORE_INHIBITORS)
+def _ignored(app: str) -> bool:
+    """True if the app id matches an IGNORE_INHIBITORS entry (the reason is not checked)."""
+    app = app.lower()
+    return any(pat.lower() in app for pat in IGNORE_INHIBITORS)
 
 
 def get_blackout_blockers() -> list[str]:
@@ -243,11 +244,11 @@ def get_blackout_blockers() -> list[str]:
         log.error(f"DBus error: {e}")
         return []
 
-    found: list[str] = []
+    found: list[tuple[str, str]] = []
     for probe in (_gnome_session_inhibitors, _kde_inhibitors):
         found += probe(bus) or []
     found += _logind_idle_inhibitors()
-    return [i for i in found if not _ignored(i)]
+    return [f"{app} ({why})" for app, why in found if not _ignored(app)]
 
 # ── Blackout process ───────────────────────────────────────────────────────────
 
