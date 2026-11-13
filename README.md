@@ -68,6 +68,7 @@ blanks, even with Steam, Discord etc. running in the background.
 | Video paused, minimized or in a background tab | blanks |
 | Music only (browser "Playing audio" inhibits suspend, not idle) | blanks |
 | App that blocks idle permanently | stays on → add it to `ignore_inhibitors` |
+| Game running via falcond (PikaOS) | stays on → see [Troubleshooting](#blackout-never-triggers-while-a-game-or-launcher-runs-falcond--pikaos) |
 
 After `max_inhibited_idle_seconds` (default 4 h) of idle it blanks anyway.
 
@@ -202,6 +203,38 @@ Check its settings (mpv: `stop-screensaver=yes`, the default).
 `journalctl --user -u oled-guard` logs `blackout skipped — …` with the app
 holding the inhibitor; `watcher.py --check` shows it as well. Add a matching
 part of its app id to `ignore_inhibitors` in `config.ini`.
+
+### Blackout never triggers while a game or launcher runs (falcond / PikaOS)
+
+[falcond](https://github.com/PikaOS-Linux/falcond) (preinstalled on PikaOS)
+blocks idle while a game profile is active. Its global `Proton` profile
+matches every Proton/Wine `.exe` — including launchers left running in the
+background, e.g. `Battle.net Launcher.exe`. The log then shows
+`blackout skipped — falcond (Game profile active)`.
+
+A running game doesn't mean someone is watching, and a static game UI is
+exactly what burns in. Ignore falcond; keyboard/mouse idle still decides:
+
+```ini
+ignore_inhibitors = steam, discord, falcond
+```
+
+Caveat: if you play with a controller only, the screen may blank mid-game,
+since GNOME's idle time may not count gamepad input.
+
+To stop launchers from triggering falcond's profile at all (it also switches
+the power profile to `performance` by default), add a `system_processes`
+list to `/etc/falcond/config.conf`:
+
+- It **replaces** `/usr/share/falcond/system.conf`, so copy that list in full
+  and append e.g. `"Battle.net Launcher.exe"`, `"AgentHelper.exe"`.
+- Matching is by exe name, case-insensitive.
+- `enable_performance_mode = false` in the same file disables the power
+  profile switch for all games.
+- Stop falcond before replacing the file
+  (`sudo systemctl stop falcond`, copy, `sudo systemctl start falcond`).
+  Its hot-reload can catch the file missing mid-copy and overwrite it with
+  defaults.
 
 ### Doesn't cover all monitors
 
